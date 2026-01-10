@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>말하는 지하철 척척박사님 (아이패드용)</title>
+    <title>말하는 지하철 척척박사님 (키보드 지원)</title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Jua&display=swap');
         
@@ -14,9 +14,9 @@
             margin: 0;
             padding: 10px;
             user-select: none;
-            -webkit-user-select: none; /* 아이패드 드래그 방지 */
+            -webkit-user-select: none;
             overflow-x: hidden;
-            touch-action: manipulation; /* 터치 지연 제거 */
+            touch-action: manipulation;
         }
 
         /* --- 1. 시작 화면 --- */
@@ -183,7 +183,8 @@
             position: relative;
         }
         .option-btn:hover { background-color: #edf2f7; }
-        .option-btn:active { transform: scale(0.98); background-color: #e2e8f0; }
+        /* 키보드 눌렸을 때 효과를 위해 active 스타일 추가 */
+        .option-btn:active, .option-btn.key-pressed { transform: scale(0.98); background-color: #e2e8f0; border-color: #cbd5e0;}
         
         .btn-num {
             color: white;
@@ -251,7 +252,7 @@
 
     <div id="start-screen">
         <h1 style="font-size: 45px; margin-bottom: 10px;">🔊 말하는 지하철 척척박사</h1>
-        <p style="font-size: 20px; color:#666; margin-bottom: 40px;">🎵 이번 역은 어디일까요?</p>
+        <p style="font-size: 20px; color:#666; margin-bottom: 40px;">키보드 숫자(1, 2, 3)를 눌러도 돼요!</p>
         
         <button class="menu-btn btn-line1" onclick="selectLine('1')">🟦 1호선 (서울역 ➡ 인천)</button>
         <button class="menu-btn btn-line5" onclick="selectLine('5')">🟪 5호선 (방화 ➡ 하남검단산)</button>
@@ -461,27 +462,22 @@
 
         // --- 2. 오디오 기능 ---
         
-        // 아이패드 호환성을 위해: 버튼 누르자마자 오디오/TTS 권한 '뚫어뻥'
         function unlockAudio() {
-            // 1. Web Audio (효과음) 권한 얻기
             if (!audioContext) audioContext = new (window.AudioContext || window.webkitAudioContext)();
             if (audioContext.state === 'suspended') audioContext.resume();
             
-            // 2. TTS (목소리) 권한 얻기 (빈 소리 한번 재생)
             if (window.speechSynthesis) {
                 const emptyUtterance = new SpeechSynthesisUtterance('');
                 window.speechSynthesis.speak(emptyUtterance);
             }
         }
 
-        // 딩동댕동 효과음
         function playChime() {
             if (!audioContext) audioContext = new (window.AudioContext || window.webkitAudioContext)();
             const now = audioContext.currentTime;
             
-            // 효과음 볼륨을 약간 줄여서 목소리가 더 잘 들리게
             const masterGain = audioContext.createGain();
-            masterGain.gain.value = 0.3; // 볼륨 30%
+            masterGain.gain.value = 0.3; 
             masterGain.connect(audioContext.destination);
 
             const notes = [523.25, 659.25, 783.99, 1046.50]; 
@@ -498,14 +494,13 @@
                 gain.gain.exponentialRampToValueAtTime(0.001, now + times[i] + 0.6); 
                 
                 osc.connect(gain);
-                gain.connect(masterGain); // 마스터 게인에 연결
+                gain.connect(masterGain); 
                 
                 osc.start(now + times[i]);
                 osc.stop(now + times[i] + 0.6);
             });
         }
 
-        // 목소리 재생
         function playSafeVoice(text) {
             if (!window.speechSynthesis) return;
             window.speechSynthesis.cancel(); 
@@ -515,7 +510,6 @@
             utterance.rate = 1.0; 
             utterance.pitch = 1.2; 
 
-            // 아이폰/아이패드/안드로이드의 '더 좋은 목소리' 찾기
             const voices = window.speechSynthesis.getVoices();
             const korVoices = voices.filter(v => v.lang.includes('ko'));
             const bestVoice = korVoices.find(v => v.name.includes('Google')) 
@@ -532,18 +526,39 @@
             window.speechSynthesis.onvoiceschanged = () => {};
         }
 
-        // 합치기 (딜레이 없이 동시에 실행하되, 효과음이 BGM처럼 깔림)
         function speakWithChime() {
             if(!currentDescText) return;
-            
-            // 아이패드 호환성을 위해 setTimeout 제거하고 바로 실행
             playChime();
             playSafeVoice(currentDescText);
         }
 
-        // --- 3. 게임 로직 ---
+        // --- 3. 키보드 입력 기능 ---
+        document.addEventListener('keydown', (e) => {
+            // 게임 화면이 아니면 무시
+            if (document.getElementById('play-screen').style.display !== 'block') return;
+
+            const key = e.key;
+            const optionBtns = document.querySelectorAll('.option-btn');
+            
+            // 키보드 1, 2, 3 매핑 (Numpad 포함)
+            if ((key === '1' || key === 'NumPad1') && optionBtns[0]) {
+                optionBtns[0].click();
+                optionBtns[0].classList.add('key-pressed');
+                setTimeout(()=>optionBtns[0].classList.remove('key-pressed'), 200);
+            } else if ((key === '2' || key === 'NumPad2') && optionBtns[1]) {
+                optionBtns[1].click();
+                optionBtns[1].classList.add('key-pressed');
+                setTimeout(()=>optionBtns[1].classList.remove('key-pressed'), 200);
+            } else if ((key === '3' || key === 'NumPad3') && optionBtns[2]) {
+                optionBtns[2].click();
+                optionBtns[2].classList.add('key-pressed');
+                setTimeout(()=>optionBtns[2].classList.remove('key-pressed'), 200);
+            }
+        });
+
+        // --- 4. 게임 로직 ---
         function selectLine(lineId) {
-            unlockAudio(); // 권한 획득
+            unlockAudio(); 
 
             currentLine = gameData[lineId];
             stationList = currentLine.stations;
@@ -687,11 +702,9 @@
                 document.getElementById('info-title').innerText = `${nextData.name}역 이야기 📖`;
                 document.getElementById('info-text').innerHTML = nextData.desc;
                 
-                // 안내방송 멘트 + 설명
                 const textToRead = `이번 역은 ${nextData.name}, ${nextData.name} 역입니다. ${nextData.desc}`;
                 currentDescText = textToRead; 
                 
-                // 권한 재확인 및 실행
                 unlockAudio(); 
                 speakWithChime(); 
 
