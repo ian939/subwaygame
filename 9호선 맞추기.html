@@ -1,0 +1,555 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>지하철 척척박사님 (1호선 & 9호선)</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Jua&display=swap');
+        
+        body {
+            font-family: 'Jua', sans-serif;
+            background-color: #FFF8E1;
+            text-align: center;
+            margin: 0;
+            padding: 10px;
+            user-select: none;
+        }
+
+        /* 시작 화면 스타일 */
+        #start-screen {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background: #fff;
+        }
+
+        .menu-btn {
+            width: 280px;
+            padding: 20px;
+            margin: 15px;
+            font-size: 24px;
+            font-family: 'Jua', sans-serif;
+            border: none;
+            border-radius: 20px;
+            cursor: pointer;
+            box-shadow: 0 5px 10px rgba(0,0,0,0.2);
+            transition: transform 0.2s;
+            color: white;
+            font-weight: bold;
+        }
+        .menu-btn:hover { transform: scale(1.05); }
+        .btn-line1 { background-color: #0052A4; } /* 1호선 남색 */
+        .btn-line9 { background-color: #AA9872; } /* 9호선 금색 */
+
+        /* 게임 화면 헤더 */
+        header {
+            display: none; /* 게임 시작 전엔 숨김 */
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 20px;
+            background: white;
+            border-radius: 15px;
+            margin-bottom: 15px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            max-width: 800px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        #game-title { margin: 0; font-size: 22px; }
+        #score-board { font-size: 20px; color: #FF8F00; }
+
+        /* 메인 컨테이너 */
+        .container {
+            display: none; /* 게임 시작 전엔 숨김 */
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 20px;
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        .left-panel { flex: 1; min-width: 300px; }
+        .right-panel { flex: 0.8; min-width: 280px; }
+
+        /* 노선도 */
+        #map-container {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: flex-start;
+            gap: 6px;
+            padding: 15px;
+            background: white;
+            border-radius: 15px;
+            margin-bottom: 20px;
+            border: 3px solid #eee;
+        }
+
+        .station-wrapper {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 45px;
+        }
+
+        .station-dot {
+            width: 12px;
+            height: 12px;
+            background-color: #ddd;
+            border-radius: 50%;
+            transition: all 0.3s;
+        }
+        
+        .station-dot.active { transform: scale(1.4); box-shadow: 0 0 8px currentColor; }
+        
+        .station-name {
+            font-size: 10px;
+            margin-top: 5px;
+            visibility: hidden;
+            text-align: center;
+            word-break: keep-all;
+        }
+        .station-name.revealed { visibility: visible; }
+
+        .transfer-badges { display: flex; gap: 2px; justify-content: center; margin-top: 2px; }
+        .line-badge { width: 6px; height: 6px; border-radius: 50%; display: inline-block; }
+
+        /* 게임 박스 */
+        #game-area {
+            background-color: white;
+            border-radius: 20px;
+            padding: 20px;
+            border: 4px solid #ddd; /* JS에서 색상 변경 */
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+
+        #current-station {
+            font-size: 28px;
+            font-weight: bold;
+            margin: 10px 0;
+            padding: 10px;
+            background-color: #fff9e6;
+            border-radius: 10px;
+        }
+
+        /* 보기 버튼 */
+        .option-btn {
+            display: flex;
+            align-items: center;
+            width: 100%;
+            padding: 12px;
+            margin: 8px 0;
+            font-size: 19px;
+            border: 2px solid #e2e8f0;
+            border-radius: 12px;
+            background-color: #f7fafc;
+            color: #444;
+            cursor: pointer;
+            font-family: 'Jua', sans-serif;
+            position: relative;
+        }
+        .option-btn:hover { background-color: #edf2f7; }
+        .btn-num {
+            background-color: #888;
+            color: white;
+            width: 28px; height: 28px;
+            border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            margin-right: 15px; font-size: 16px;
+        }
+
+        /* 오답 피드백 텍스트 (몇호선인지) */
+        .wrong-feedback {
+            font-size: 14px;
+            color: #e53e3e;
+            margin-left: auto;
+            font-weight: bold;
+        }
+
+        /* 설명 카드 */
+        #info-card {
+            background-color: #FFF;
+            border-radius: 20px;
+            padding: 25px;
+            border: 4px solid #FFAB91;
+            text-align: left;
+        }
+        #info-title { font-size: 24px; color: #D84315; margin-bottom: 15px; border-bottom: 2px dashed #FFCCBC; padding-bottom: 10px;}
+        #info-text { font-size: 20px; color: #555; line-height: 1.5; }
+
+        /* 상태 메시지 */
+        #message { height: 30px; font-size: 20px; font-weight: bold; margin-top: 10px; }
+        .correct { color: #2E7D32; } .wrong { color: #C62828; }
+
+        #success-screen { display: none; }
+        .nav-btn { background-color: #555; color: white; padding: 10px 20px; border: none; border-radius: 20px; font-size: 18px; margin-top: 10px; cursor: pointer;}
+        
+        /* 힌트 애니메이션 */
+        .hint-active { background-color: #b2f5ea !important; animation: shake 0.5s infinite; }
+        @keyframes shake { 0%, 100% {transform:translateX(0);} 25% {transform:translateX(-5px);} 75% {transform:translateX(5px);} }
+
+    </style>
+</head>
+<body>
+
+    <div id="start-screen">
+        <h1 style="font-size: 40px; margin-bottom: 30px;">🚂 지하철 척척박사님</h1>
+        <p style="font-size: 20px; margin-bottom: 30px;">어떤 노선을 외워볼까요?</p>
+        
+        <button class="menu-btn btn-line1" onclick="selectLine('1')">🟦 1호선 (서울역 ➡ 인천)</button>
+        <button class="menu-btn btn-line9" onclick="selectLine('9')">🟨 9호선 (중앙보훈 ➡ 개화)</button>
+    </div>
+
+    <header id="game-header">
+        <h1 id="game-title">노선 이름</h1>
+        <div id="score-board">⭐ 맞춘 개수: 0개</div>
+    </header>
+
+    <div class="container" id="game-container">
+        <div class="left-panel">
+            <div id="map-container"></div>
+
+            <div id="game-area">
+                <div id="play-screen">
+                    <div style="font-size:16px; color:#888;">지금 역은?</div>
+                    <div id="current-station">출발역</div>
+                    <div class="arrow" style="font-size: 20px; color:#aaa; margin:10px 0;">⬇️ 다음 역은 어디일까요? ⬇️</div>
+                    
+                    <div id="options-container"></div>
+                    <div id="message"></div>
+                </div>
+
+                <div id="success-screen">
+                    <h2 style="font-size:30px;">🎉 도착! 🎉</h2>
+                    <p id="success-msg">종점에 도착했어요!</p>
+                    <button class="nav-btn" onclick="location.reload()">처음으로 돌아가기</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="right-panel">
+            <div id="info-card">
+                <div id="info-title">역 이야기 📖</div>
+                <div id="info-text">
+                    안녕? 나는 설명 요정이야.<br>
+                    문제를 맞추면 내가 재미있는 이야기를 들려줄게!
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- 데이터 영역 ---
+
+        // 노선별 색상
+        const lineColors = {
+            "1": "#0052A4", "2": "#009D3E", "3": "#EF7C1C", "4": "#0052A4", 
+            "5": "#996CAC", "6": "#CD7C2F", "7": "#747F00", "8": "#E6186C", "9": "#AA9872",
+            "분당": "#F5A200", "신분당": "#D4003B", "공항": "#0090D2", 
+            "신림": "#6789CA", "서해": "#81A914", "인천1": "#7CA8D5", "수인분당": "#F5A200"
+        };
+
+        // 오답용 다른 호선 역 정보 (이름: 호선)
+        const otherStationsDB = {
+            "강남": "2호선", "잠실": "2호선", "홍대입구": "2호선", "신도림": "1,2호선", "사당": "2,4호선",
+            "을지로입구": "2호선", "성수": "2호선", "압구정": "3호선", "신사": "3호선", "양재": "3호선",
+            "명동": "4호선", "동대문": "1,4호선", "혜화": "4호선", "이태원": "6호선", "상수": "6호선",
+            "건대입구": "2,7호선", "광화문": "5호선", "천호": "5,8호선", "수서": "3,수인분당", "판교": "신분당"
+        };
+
+        // 게임 데이터 (1호선, 9호선)
+        const gameData = {
+            "1": {
+                name: "1호선 (서울역 ➡ 인천)",
+                mainColor: "#0052A4",
+                stations: [
+                    { name: "서울역", trans: ["4", "공항"], desc: "우리나라에서 제일 큰 기차역이야! KTX 칙칙폭폭! 🚄" },
+                    { name: "남영", trans: [], desc: "여기엔 맛있는 스테이크 골목이 있대. 🥩" },
+                    { name: "용산", trans: ["경의중앙"], desc: "로봇이랑 컴퓨터를 파는 전자상가가 있어! 🤖" },
+                    { name: "노량진", trans: ["9"], desc: "펄떡펄떡 물고기가 있는 수산시장! 🐟" },
+                    { name: "대방", trans: ["신림"], desc: "여의도로 들어가는 입구야. 🏢" },
+                    { name: "신길", trans: ["5"], desc: "매운 짬뽕이 아주 유명한 동네야. 🍜" },
+                    { name: "영등포", trans: [], desc: "기차도 서고, 백화점도 있는 큰 역이야. 🛍️" },
+                    { name: "신도림", trans: ["2"], desc: "사람들이 정말 많이 갈아타는 역이야. 북적북적! 👨‍👩‍👧‍👦" },
+                    { name: "구로", trans: [], desc: "여기서 인천 가는 기차랑 수원 가는 기차가 갈라져! 🛤️" },
+                    { name: "구일", trans: [], desc: "고척스카이돔 야구장이 바로 보여! ⚾" },
+                    { name: "개봉", trans: [], desc: "재미있는 영화관이 있는 역이야. 🍿" },
+                    { name: "오류동", trans: [], desc: "예전에 주막거리가 있던 곳이래. 🌳" },
+                    { name: "온수", trans: ["7"], desc: "7호선으로 갈아타면 강남으로 갈 수 있어. 🚇" },
+                    { name: "역곡", trans: [], desc: "시장이 가까워서 사람들이 많아. 🍎" },
+                    { name: "소사", trans: ["서해"], desc: "아주 맛있는 복숭아가 유명했던 곳이래. 🍑" },
+                    { name: "부천", trans: [], desc: "큰 이마트랑 역이 연결되어 있어. 🛒" },
+                    { name: "중동", trans: [], desc: "아파트가 아주 많은 동네야. 🏢" },
+                    { name: "송내", trans: [], desc: "여기서 버스 타면 영화 거리에 갈 수 있어. 🎬" },
+                    { name: "부개", trans: [], desc: "조용하고 살기 좋은 동네야. 🏘️" },
+                    { name: "부평", trans: ["인천1"], desc: "지하상가가 미로처럼 엄청 넓어! 길 잃지 않게 조심! 😵" },
+                    { name: "백운", trans: [], desc: "하얀 구름이라는 예쁜 이름이야. ☁️" },
+                    { name: "동암", trans: [], desc: "십정동이라는 마을이 근처에 있어. 🐕" },
+                    { name: "간석", trans: [], desc: "큰 바위가 있었다고 해서 간석이래. 🪨" },
+                    { name: "주안", trans: ["인천2"], desc: "인천 지하철 2호선으로 갈아탈 수 있어. 🚉" },
+                    { name: "도화", trans: [], desc: "복숭아 꽃이 많이 피던 동네래. 🌸" },
+                    { name: "제물포", trans: [], desc: "학교들이 많이 모여있는 곳이야. 🏫" },
+                    { name: "도원", trans: [], desc: "인천 축구 전용 경기장이 바로 옆이야! ⚽" },
+                    { name: "동인천", trans: [], desc: "맛있는 닭강정이 유명한 시장이 있어! 🍗" },
+                    { name: "인천", trans: ["수인분당"], desc: "도착! 짜장면이 태어난 차이나타운이 있어! 🇨🇳" }
+                ]
+            },
+            "9": {
+                name: "9호선 (중앙보훈 ➡ 개화)",
+                mainColor: "#AA9872",
+                stations: [
+                    { name: "중앙보훈병원", trans: [], desc: "나라를 지킨 영웅들을 위한 병원이야. 🏥" },
+                    { name: "둔촌오륜", trans: [], desc: "큰 학교가 옆에 있어. 🏫" },
+                    { name: "올림픽공원", trans: ["5"], desc: "거대한 엄지손가락 조각상을 찾아봐! 👍" },
+                    { name: "한성백제", trans: [], desc: "백제 시대 박물관이 있어. 🏺" },
+                    { name: "송파나루", trans: [], desc: "옛날엔 배가 다니던 곳이래. ⛵" },
+                    { name: "석촌", trans: ["8"], desc: "롯데월드타워가 슝~ 하고 보여! 🏙️" },
+                    { name: "석촌고분", trans: [], desc: "옛날 왕들의 무덤이 있어. 👑" },
+                    { name: "삼전", trans: [], desc: "잠실이랑 가까운 동네야. 🏠" },
+                    { name: "종합운동장", trans: ["2"], desc: "야구장에서 응원 소리가 들려! ⚾" },
+                    { name: "봉은사", trans: [], desc: "도심 속에 아주 큰 절이 있어. 🏯" },
+                    { name: "삼성중앙", trans: [], desc: "코엑스랑 가까워. 🛍️" },
+                    { name: "선정릉", trans: ["수인분당"], desc: "숲 속에 왕릉이 숨어있어. 🌳" },
+                    { name: "언주", trans: [], desc: "강남 차병원이 근처에 있어. 🚑" },
+                    { name: "신논현", trans: ["신분당"], desc: "강남에서 제일 복잡한 곳 중 하나야! 🏢" },
+                    { name: "사평", trans: [], desc: "조용한 아파트 단지야. 🏘️" },
+                    { name: "고속터미널", trans: ["3", "7"], desc: "여행 가는 버스를 타는 곳이야! 🚌" },
+                    { name: "신반포", trans: [], desc: "한강 공원으로 산책 가자! 🌊" },
+                    { name: "구반포", trans: [], desc: "작은 냇물이 흐르는 곳이야. 🦆" },
+                    { name: "동작", trans: ["4"], desc: "현충원이 있는 곳이야. 🇰🇷" },
+                    { name: "흑석", trans: [], desc: "중앙대학교가 있어. 🎓" },
+                    { name: "노들", trans: [], desc: "한강 위에 떠 있는 섬이야! 🏝️" },
+                    { name: "노량진", trans: ["1"], desc: "맛있는 회를 먹으러 가자! 🐟" },
+                    { name: "샛강", trans: ["신림"], desc: "여의도 샛강에 오리들이 살아. 🦆" },
+                    { name: "여의도", trans: ["5"], desc: "더현대 서울 백화점이 있어! 🎁" },
+                    { name: "국회의사당", trans: [], desc: "태권V가 나올 것 같은 둥근 지붕 건물! 🏛️" },
+                    { name: "당산", trans: ["2"], desc: "전철 타고 한강 다리를 건너봐! 🌉" },
+                    { name: "선유도", trans: [], desc: "공원이 된 옛날 정수장이야. ⛲" },
+                    { name: "신목동", trans: [], desc: "자전거 타기 좋은 안양천이 있어. 🚲" },
+                    { name: "염창", trans: [], desc: "옛날에 소금 창고가 있었대. 🧂" },
+                    { name: "등촌", trans: [], desc: "칼국수가 맛있는 동네야. 🍜" },
+                    { name: "증미", trans: [], desc: "이마트가 바로 옆에 있어. 🛒" },
+                    { name: "가양", trans: [], desc: "허준 선생님 박물관이 있어! 👨‍⚕️" },
+                    { name: "양천향교", trans: [], desc: "옛날 학교가 그대로 남아있어. 📜" },
+                    { name: "마곡나루", trans: ["공항"], desc: "식물원이 아주 멋진 곳이야! 🌵" },
+                    { name: "신방화", trans: [], desc: "새 아파트들이 아주 많아. 🏢" },
+                    { name: "공항시장", trans: [], desc: "시장에서 맛있는 떡볶이 먹자. 🍢" },
+                    { name: "김포공항", trans: ["5", "공항", "서해"], desc: "비행기 타고 여행 가자! ✈️" },
+                    { name: "개화", trans: [], desc: "9호선 기차들이 잠자는 집이야. 💤" }
+                ]
+            }
+        };
+
+        // --- 게임 로직 ---
+        let currentLine = null;
+        let stationList = [];
+        let currentIndex = 0;
+        let score = 0;
+
+        // 노선 선택 함수
+        function selectLine(lineId) {
+            currentLine = gameData[lineId];
+            stationList = currentLine.stations;
+            
+            // 화면 전환
+            document.getElementById('start-screen').style.display = 'none';
+            document.getElementById('game-header').style.display = 'flex';
+            document.getElementById('game-container').style.display = 'flex';
+            
+            // 테마 색상 적용
+            document.getElementById('game-title').innerText = currentLine.name;
+            document.getElementById('game-title').style.color = currentLine.mainColor;
+            document.getElementById('game-area').style.borderColor = currentLine.mainColor;
+            
+            // 보기 버튼의 숫자 배경색 변경을 위한 CSS 변수 세팅은 복잡하니
+            // JS로 버튼 생성시 색상을 직접 넣겠습니다.
+
+            initGame();
+        }
+
+        function initGame() {
+            currentIndex = 0;
+            score = 0;
+            updateScore();
+            
+            document.getElementById('play-screen').style.display = 'block';
+            document.getElementById('success-screen').style.display = 'none';
+            document.getElementById('message').innerText = "";
+            document.getElementById('info-title').innerText = "역 이야기 📖";
+            document.getElementById('info-text').innerHTML = "안녕? 지하철 여행을 떠나볼까?<br>문제를 맞추면 내가 재미있는 이야기를 해줄게!";
+
+            drawMap();
+            loadQuestion();
+        }
+
+        function updateScore() {
+            document.getElementById('score-board').innerText = `⭐ 맞춘 개수: ${score}개`;
+        }
+
+        function drawMap() {
+            const mapContainer = document.getElementById('map-container');
+            mapContainer.innerHTML = '';
+
+            stationList.forEach((station, index) => {
+                const wrapper = document.createElement('div');
+                wrapper.className = 'station-wrapper';
+
+                const dot = document.createElement('div');
+                dot.className = 'station-dot';
+                dot.id = `dot-${index}`;
+                // 활성화될 때 색상은 CSS currentColor 사용을 위해 style color 지정
+                dot.style.color = currentLine.mainColor; 
+                
+                // 이름 및 환승정보
+                const nameDiv = document.createElement('div');
+                nameDiv.className = 'station-name';
+                nameDiv.id = `name-${index}`;
+                nameDiv.innerText = station.name;
+
+                if(station.trans.length > 0) {
+                    const badgeContainer = document.createElement('div');
+                    badgeContainer.className = 'transfer-badges';
+                    station.trans.forEach(line => {
+                        const badge = document.createElement('span');
+                        badge.className = 'line-badge';
+                        badge.style.backgroundColor = lineColors[line] || '#ccc';
+                        badgeContainer.appendChild(badge);
+                    });
+                    nameDiv.appendChild(badgeContainer);
+                }
+
+                wrapper.appendChild(dot);
+                wrapper.appendChild(nameDiv);
+                mapContainer.appendChild(wrapper);
+            });
+            
+            revealStation(0);
+        }
+
+        function revealStation(index) {
+            const dot = document.getElementById(`dot-${index}`);
+            const name = document.getElementById(`name-${index}`);
+            if(dot) {
+                dot.classList.add('active');
+                dot.style.backgroundColor = currentLine.mainColor;
+            }
+            if(name) name.classList.add('revealed');
+        }
+
+        function loadQuestion() {
+            if (currentIndex >= stationList.length - 1) {
+                gameClear();
+                return;
+            }
+
+            const currentData = stationList[currentIndex];
+            const nextData = stationList[currentIndex + 1];
+
+            document.getElementById('current-station').innerText = currentData.name;
+            document.getElementById('current-station').style.color = currentLine.mainColor;
+            
+            // 보기 생성 (정답 + 오답 2개)
+            let options = [nextData.name];
+            
+            // 오답 후보군 만들기 (다른 노선 역들 + 현재 노선의 다른 역들 섞기)
+            const otherLineStations = Object.keys(otherStationsDB);
+            const currentLineStationNames = stationList.map(s => s.name);
+            const allWrongCandidates = [...otherLineStations, ...currentLineStationNames];
+
+            while(options.length < 3) {
+                const randomPick = allWrongCandidates[Math.floor(Math.random() * allWrongCandidates.length)];
+                // 정답 아님 & 이미 보기에 없음 & 현재 역 아님
+                if(randomPick !== nextData.name && !options.includes(randomPick) && randomPick !== currentData.name) {
+                    options.push(randomPick);
+                }
+            }
+
+            // 보기 섞기
+            options.sort(() => Math.random() - 0.5);
+
+            const optionsContainer = document.getElementById('options-container');
+            optionsContainer.innerHTML = '';
+
+            options.forEach((optName, idx) => {
+                const btn = document.createElement('button');
+                btn.className = 'option-btn';
+                
+                // 번호표 색상을 현재 노선 색상으로
+                const numSpan = `<span class="btn-num" style="background-color:${currentLine.mainColor}">${idx+1}</span>`;
+                btn.innerHTML = `${numSpan} ${optName}`;
+                
+                // 클릭 이벤트
+                btn.onclick = () => checkAnswer(optName, nextData, btn);
+                
+                optionsContainer.appendChild(btn);
+            });
+        }
+
+        function checkAnswer(selectedName, nextData, btnElement) {
+            const messageEl = document.getElementById('message');
+
+            if (selectedName === nextData.name) {
+                // [정답]
+                messageEl.innerText = "딩동댕! 정답입니다! ⭕";
+                messageEl.className = "correct";
+                score++;
+                updateScore();
+                currentIndex++;
+                revealStation(currentIndex);
+
+                // 설명 업데이트
+                document.getElementById('info-title').innerText = `${nextData.name}역 이야기 📖`;
+                document.getElementById('info-text').innerHTML = nextData.desc;
+
+                setTimeout(() => {
+                    messageEl.innerText = "";
+                    loadQuestion();
+                }, 1500);
+
+            } else {
+                // [오답] -> 몇 호선인지 알려주기 로직
+                let feedbackText = "";
+                
+                // 1. 오답 DB에 있는지 확인 (다른 호선 역)
+                if (otherStationsDB[selectedName]) {
+                    feedbackText = `(땡! ${otherStationsDB[selectedName]}이에요)`;
+                } 
+                // 2. 현재 노선 안에 있는 다른 역인지 확인
+                else {
+                    const foundInCurrent = stationList.find(s => s.name === selectedName);
+                    if (foundInCurrent) {
+                        feedbackText = `(같은 ${currentLine.name.split(' ')[0]}이지만 다음 역은 아니에요)`;
+                    } else {
+                        feedbackText = "(다른 호선 역이에요)";
+                    }
+                }
+
+                // 버튼 안에 피드백 텍스트 추가 (이미 있으면 업데이트)
+                let feedbackSpan = btnElement.querySelector('.wrong-feedback');
+                if(!feedbackSpan) {
+                    feedbackSpan = document.createElement('span');
+                    feedbackSpan.className = 'wrong-feedback';
+                    btnElement.appendChild(feedbackSpan);
+                }
+                feedbackSpan.innerText = feedbackText;
+
+                messageEl.innerText = "어? 다시 한번 생각해볼까? ❌";
+                messageEl.className = "wrong";
+                btnElement.style.backgroundColor = "#fff5f5"; // 연한 빨강 배경
+            }
+        }
+
+        function gameClear() {
+            document.getElementById('play-screen').style.display = 'none';
+            document.getElementById('success-screen').style.display = 'block';
+            document.getElementById('success-msg').innerText = `${currentLine.name} 종점 도착! 정말 대단해!`;
+            
+            document.getElementById('info-title').innerText = "축하해! 🎉";
+            document.getElementById('info-text').innerHTML = "지하철 노선을 전부 외웠구나!<br>너는 정말 최고의 척척박사님이야! 🎓";
+        }
+    </script>
+</body>
+</html>
