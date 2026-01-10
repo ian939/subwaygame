@@ -2,8 +2,8 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>말하는 지하철 척척박사님 (안내방송 버전)</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>말하는 지하철 척척박사님 (아이패드용)</title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Jua&display=swap');
         
@@ -14,7 +14,9 @@
             margin: 0;
             padding: 10px;
             user-select: none;
+            -webkit-user-select: none; /* 아이패드 드래그 방지 */
             overflow-x: hidden;
+            touch-action: manipulation; /* 터치 지연 제거 */
         }
 
         /* --- 1. 시작 화면 --- */
@@ -38,14 +40,14 @@
             border-radius: 20px;
             cursor: pointer;
             box-shadow: 0 5px 10px rgba(0,0,0,0.2);
-            transition: transform 0.2s;
+            transition: transform 0.1s;
             color: white;
             font-weight: bold;
             text-align: left;
             padding-left: 30px;
             position: relative;
         }
-        .menu-btn:hover { transform: scale(1.05); }
+        .menu-btn:active { transform: scale(0.98); }
         .menu-btn::after { content: '▶'; position: absolute; right: 20px; opacity: 0.5; }
         
         .btn-line1 { background-color: #0052A4; } 
@@ -181,6 +183,7 @@
             position: relative;
         }
         .option-btn:hover { background-color: #edf2f7; }
+        .option-btn:active { transform: scale(0.98); background-color: #e2e8f0; }
         
         .btn-num {
             color: white;
@@ -456,14 +459,31 @@
         let currentDescText = ""; 
         let audioContext = null; 
 
-        // --- 2. 오디오 기능 (안전한 내장 TTS 사용 + 튜닝) ---
+        // --- 2. 오디오 기능 ---
         
-        // (1) 딩동댕동 효과음 (Web Audio API)
+        // 아이패드 호환성을 위해: 버튼 누르자마자 오디오/TTS 권한 '뚫어뻥'
+        function unlockAudio() {
+            // 1. Web Audio (효과음) 권한 얻기
+            if (!audioContext) audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            if (audioContext.state === 'suspended') audioContext.resume();
+            
+            // 2. TTS (목소리) 권한 얻기 (빈 소리 한번 재생)
+            if (window.speechSynthesis) {
+                const emptyUtterance = new SpeechSynthesisUtterance('');
+                window.speechSynthesis.speak(emptyUtterance);
+            }
+        }
+
+        // 딩동댕동 효과음
         function playChime() {
             if (!audioContext) audioContext = new (window.AudioContext || window.webkitAudioContext)();
             const now = audioContext.currentTime;
+            
+            // 효과음 볼륨을 약간 줄여서 목소리가 더 잘 들리게
+            const masterGain = audioContext.createGain();
+            masterGain.gain.value = 0.3; // 볼륨 30%
+            masterGain.connect(audioContext.destination);
 
-            // 도-미-솔-도 (딩-동-댕-동)
             const notes = [523.25, 659.25, 783.99, 1046.50]; 
             const times = [0, 0.4, 0.8, 1.2]; 
 
@@ -474,33 +494,33 @@
                 osc.type = 'sine'; 
                 osc.frequency.value = freq;
                 
-                gain.gain.setValueAtTime(0.2, now + times[i]);
+                gain.gain.setValueAtTime(0.5, now + times[i]);
                 gain.gain.exponentialRampToValueAtTime(0.001, now + times[i] + 0.6); 
                 
                 osc.connect(gain);
-                gain.connect(audioContext.destination);
+                gain.connect(masterGain); // 마스터 게인에 연결
                 
                 osc.start(now + times[i]);
                 osc.stop(now + times[i] + 0.6);
             });
-
-            return 1800; // 1.8초 후 말하기
         }
 
-        // (2) 안전한 내장 목소리 (톤 업!)
+        // 목소리 재생
         function playSafeVoice(text) {
             if (!window.speechSynthesis) return;
-            window.speechSynthesis.cancel(); // 겹침 방지
+            window.speechSynthesis.cancel(); 
 
             const utterance = new SpeechSynthesisUtterance(text);
             utterance.lang = 'ko-KR';
             utterance.rate = 1.0; 
-            utterance.pitch = 1.2; // 1.2배 (살짝 높음, 너무 높으면 갈라짐)
+            utterance.pitch = 1.2; 
 
+            // 아이폰/아이패드/안드로이드의 '더 좋은 목소리' 찾기
             const voices = window.speechSynthesis.getVoices();
             const korVoices = voices.filter(v => v.lang.includes('ko'));
             const bestVoice = korVoices.find(v => v.name.includes('Google')) 
                            || korVoices.find(v => v.name.includes('Siri'))
+                           || korVoices.find(v => v.name.includes('Premium'))
                            || korVoices[0];
 
             if(bestVoice) utterance.voice = bestVoice;
@@ -512,23 +532,18 @@
             window.speechSynthesis.onvoiceschanged = () => {};
         }
 
-        // (3) 합치기: 딩동댕동 -> 말하기
+        // 합치기 (딜레이 없이 동시에 실행하되, 효과음이 BGM처럼 깔림)
         function speakWithChime() {
             if(!currentDescText) return;
             
-            // 1. 딩동댕동
-            const delay = playChime();
-            
-            // 2. 말하기 (에러 없이 안전함)
-            setTimeout(() => {
-                playSafeVoice(currentDescText);
-            }, delay);
+            // 아이패드 호환성을 위해 setTimeout 제거하고 바로 실행
+            playChime();
+            playSafeVoice(currentDescText);
         }
 
         // --- 3. 게임 로직 ---
         function selectLine(lineId) {
-            if (!audioContext) audioContext = new (window.AudioContext || window.webkitAudioContext)();
-            if (audioContext.state === 'suspended') audioContext.resume();
+            unlockAudio(); // 권한 획득
 
             currentLine = gameData[lineId];
             stationList = currentLine.stations;
@@ -672,11 +687,13 @@
                 document.getElementById('info-title').innerText = `${nextData.name}역 이야기 📖`;
                 document.getElementById('info-text').innerHTML = nextData.desc;
                 
-                // [핵심 변경] "이번 역은 OOO, OOO 역입니다." 추가
+                // 안내방송 멘트 + 설명
                 const textToRead = `이번 역은 ${nextData.name}, ${nextData.name} 역입니다. ${nextData.desc}`;
                 currentDescText = textToRead; 
                 
-                speakWithChime(); // 딩동댕동 + 말하기
+                // 권한 재확인 및 실행
+                unlockAudio(); 
+                speakWithChime(); 
 
                 setTimeout(() => {
                     messageEl.innerText = "";
@@ -721,6 +738,7 @@
             document.getElementById('info-text').innerHTML = clearText;
             
             currentDescText = clearText;
+            unlockAudio();
             speakWithChime();
         }
     </script>
