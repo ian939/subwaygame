@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>말하는 지하철 척척박사님 (최종)</title>
+    <title>말하는 지하철 척척박사님 (예쁜 목소리 버전)</title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Jua&display=swap');
         
@@ -43,8 +43,10 @@
             font-weight: bold;
             text-align: left;
             padding-left: 30px;
+            position: relative;
         }
         .menu-btn:hover { transform: scale(1.05); }
+        .menu-btn::after { content: '▶'; position: absolute; right: 20px; opacity: 0.5; }
         
         .btn-line1 { background-color: #0052A4; } 
         .btn-line5 { background-color: #996CAC; } 
@@ -220,17 +222,17 @@
             color: white;
             border: none;
             border-radius: 50%;
-            width: 45px;
-            height: 45px;
+            width: 50px;
+            height: 50px;
             font-size: 24px;
             cursor: pointer;
             display: flex;
             align-items: center;
             justify-content: center;
-            box-shadow: 0 3px 6px rgba(0,0,0,0.2);
+            box-shadow: 0 4px 0 #D84315;
             transition: transform 0.1s;
         }
-        #speak-btn:active { transform: scale(0.9); }
+        #speak-btn:active { transform: translateY(4px); box-shadow: none; }
 
         #info-text { font-size: 22px; color: #444; line-height: 1.6; }
 
@@ -246,7 +248,7 @@
 
     <div id="start-screen">
         <h1 style="font-size: 45px; margin-bottom: 10px;">🔊 말하는 지하철 척척박사</h1>
-        <p style="font-size: 20px; color:#666; margin-bottom: 40px;">문제를 맞추면 이야기를 읽어줄게요!</p>
+        <p style="font-size: 20px; color:#666; margin-bottom: 40px;">🎵 딩동댕동~ 안내방송이 나와요!</p>
         
         <button class="menu-btn btn-line1" onclick="selectLine('1')">🟦 1호선 (서울역 ➡ 인천)</button>
         <button class="menu-btn btn-line5" onclick="selectLine('5')">🟪 5호선 (방화 ➡ 하남검단산)</button>
@@ -284,7 +286,7 @@
             <div id="info-card">
                 <div id="info-header">
                     <h3 id="info-title">역 이야기 📖</h3>
-                    <button id="speak-btn" onclick="speakCurrentText()" title="다시 듣기">🔊</button>
+                    <button id="speak-btn" onclick="speakWithChime()" title="다시 듣기">🔊</button>
                 </div>
                 <div id="info-text">
                     안녕? 나는 지하철 요정이야.<br>
@@ -451,51 +453,74 @@
         let currentLine = null;
         let stationList = [];
         let currentIndex = 0;
-        let currentDescText = ""; // 말할 내용 저장
+        let currentDescText = ""; 
+        let audioContext = null; // 효과음용 오디오 컨텍스트
 
-        // --- 2. TTS (자연스러운 목소리 선택) ---
-        let voices = [];
+        // --- 2. 오디오 기능 (딩동댕동 + 구글 TTS) ---
         
-        function setVoices() {
-            voices = window.speechSynthesis.getVoices();
+        // (1) 딩동댕동 효과음 만들기 (신디사이저)
+        function playChime() {
+            if (!audioContext) audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            const now = audioContext.currentTime;
+
+            // 도-미-솔-도 (딩-동-댕-동 느낌)
+            const notes = [523.25, 659.25, 783.99, 1046.50]; // C5, E5, G5, C6
+            const times = [0, 0.4, 0.8, 1.2]; // 시간 간격
+
+            notes.forEach((freq, i) => {
+                const osc = audioContext.createOscillator();
+                const gain = audioContext.createGain();
+                
+                osc.type = 'sine'; // 부드러운 사인파
+                osc.frequency.value = freq;
+                
+                gain.gain.setValueAtTime(0.2, now + times[i]);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + times[i] + 0.6); // 잔향
+                
+                osc.connect(gain);
+                gain.connect(audioContext.destination);
+                
+                osc.start(now + times[i]);
+                osc.stop(now + times[i] + 0.6);
+            });
+
+            // 전체 길이(초) 반환 (약 1.8초 뒤에 말하기 시작하려고)
+            return 1800;
         }
 
-        if (window.speechSynthesis) {
-            setVoices();
-            window.speechSynthesis.onvoiceschanged = setVoices;
+        // (2) 구글 목소리 가져오기 (URL 방식 - 안 무서움!)
+        function playGoogleVoice(text) {
+            const encodedText = encodeURIComponent(text);
+            // 구글 번역 TTS API (비공식적이지만 개인용으로 가장 좋은 퀄리티)
+            const url = `https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=ko&q=${encodedText}`;
+            
+            const audio = new Audio(url);
+            audio.play().catch(e => {
+                console.log("자동 재생 막힘 또는 인터넷 문제:", e);
+                // 실패시 브라우저 기본 음성으로 폴백 (어쩔 수 없음)
+                alert("인터넷 연결을 확인해주세요! 소리가 안 날 수 있어요.");
+            });
         }
 
-        function speakText(text) {
-            if (!window.speechSynthesis) return;
-
-            window.speechSynthesis.cancel();
-
-            const utterance = new SpeechSynthesisUtterance(text);
-            utterance.lang = 'ko-KR'; 
-            utterance.rate = 1.0; 
-            utterance.pitch = 1.0; 
-
-            // 구글/Siri 목소리 우선 선택 로직
-            const korVoices = voices.filter(v => v.lang.includes('ko'));
-            const bestVoice = korVoices.find(v => v.name.includes('Google')) 
-                           || korVoices.find(v => v.name.includes('Siri'))
-                           || korVoices.find(v => v.name.includes('Premium'))
-                           || korVoices[0];
-
-            if (bestVoice) {
-                utterance.voice = bestVoice;
-            }
-
-            window.speechSynthesis.speak(utterance);
-        }
-
-        function speakCurrentText() {
-            if(voices.length === 0) setVoices();
-            speakText(currentDescText);
+        // (3) 합치기: 딩동댕동 -> (잠깐 쉬고) -> 말하기
+        function speakWithChime() {
+            if(!currentDescText) return;
+            
+            // 1. 딩동댕동~
+            const delay = playChime();
+            
+            // 2. 말하기
+            setTimeout(() => {
+                playGoogleVoice(currentDescText);
+            }, delay);
         }
 
         // --- 3. 게임 로직 ---
         function selectLine(lineId) {
+            // 오디오 컨텍스트 활성화 (모바일 터치 대응)
+            if (!audioContext) audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            if (audioContext.state === 'suspended') audioContext.resume();
+
             currentLine = gameData[lineId];
             stationList = currentLine.stations;
             
@@ -521,7 +546,7 @@
             
             const introText = "안녕? 나는 지하철 요정이야.<br>정답을 맞추면 이야기를 읽어줄게!";
             document.getElementById('info-text').innerHTML = introText;
-            currentDescText = "안녕? 나는 지하철 요정이야. 정답을 맞추면 이야기를 읽어줄게!"; // 읽을 땐 태그 제거
+            currentDescText = "안녕? 나는 지하철 요정이야. 정답을 맞추면 이야기를 읽어줄게!"; 
             
             drawMapInitial();
             revealStation(0);
@@ -639,10 +664,11 @@
                 document.getElementById('info-title').innerText = `${nextData.name}역 이야기 📖`;
                 document.getElementById('info-text').innerHTML = nextData.desc;
                 
-                // [핵심] "OO역은, ~~~" 형태로 만들어서 읽어주기
+                // [핵심] "OO역은, ~~~" 형태로 만들어서 읽어주기 + 딩동댕동
                 const textToRead = `${nextData.name}역은, ${nextData.desc}`;
                 currentDescText = textToRead; 
-                speakText(textToRead); 
+                
+                speakWithChime(); // 딩동댕동 + 말하기 실행
 
                 setTimeout(() => {
                     messageEl.innerText = "";
@@ -687,7 +713,7 @@
             document.getElementById('info-text').innerHTML = clearText;
             
             currentDescText = clearText;
-            speakText(clearText);
+            speakWithChime();
         }
     </script>
 </body>
