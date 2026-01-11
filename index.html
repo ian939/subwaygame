@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>말하는 지하철 척척박사님 (전체 노선)</title>
+    <title>말하는 지하철 척척박사님 (방향선택 + 패스모드)</title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Jua&display=swap');
         
@@ -19,19 +19,21 @@
             touch-action: manipulation;
         }
 
-        /* --- 1. 시작 화면 --- */
-        #start-screen {
-            display: flex;
+        /* --- 화면 공통 스타일 --- */
+        .screen {
+            display: none;
             flex-direction: column;
             justify-content: center;
             align-items: center;
             min-height: 90vh;
-            background: #fff;
         }
+
+        /* 1. 시작 화면 */
+        #start-screen { display: flex; }
 
         .menu-container {
             display: grid;
-            grid-template-columns: 1fr 1fr; /* 2열 배치 */
+            grid-template-columns: 1fr 1fr;
             gap: 15px;
             width: 95%;
             max-width: 600px;
@@ -61,7 +63,27 @@
         .btn-line5 { background-color: #996CAC; } 
         .btn-line9 { background-color: #AA9872; } 
 
-        /* --- 2. 게임 화면 헤더 --- */
+        /* 2. 방향 선택 화면 */
+        #direction-screen { background: #fff; }
+        
+        .direction-btn {
+            width: 80%;
+            max-width: 400px;
+            padding: 25px;
+            margin: 15px;
+            font-size: 24px;
+            font-family: 'Jua', sans-serif;
+            border: 4px solid #ddd;
+            border-radius: 20px;
+            background: white;
+            color: #333;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .direction-btn:hover { background-color: #f0f0f0; }
+        .direction-btn:active { transform: scale(0.95); border-color: #aaa;}
+
+        /* 3. 게임 화면 */
         header {
             display: none;
             justify-content: space-between;
@@ -80,7 +102,6 @@
         #score-board { font-size: 22px; color: #555; font-weight: bold; }
         .highlight-score { color: #FF8F00; font-size: 26px; }
 
-        /* --- 3. 메인 레이아웃 --- */
         .container {
             display: none;
             flex-wrap: wrap;
@@ -93,7 +114,7 @@
         .left-panel { flex: 1; min-width: 320px; }
         .right-panel { flex: 0.7; min-width: 280px; }
 
-        /* --- 4. 지도 --- */
+        /* 지도 스타일 */
         #map-container {
             display: flex;
             flex-wrap: wrap;
@@ -129,17 +150,24 @@
         .station-dot {
             width: 14px;
             height: 14px;
-            background-color: #eee;
+            background-color: #eee; /* 기본 회색 */
             border: 2px solid #ddd;
             border-radius: 50%;
             z-index: 1;
             transition: all 0.4s;
         }
         
+        /* 정답 맞췄을 때 (색칠됨) */
         .station-dot.active {
             transform: scale(1.3);
             border: 2px solid white;
             box-shadow: 0 0 5px rgba(0,0,0,0.3);
+        }
+        
+        /* 틀렸을 때 (회색 유지 + X 표시 느낌) */
+        .station-dot.missed {
+            background-color: #999 !important;
+            border: 2px solid #555 !important;
         }
 
         .station-name {
@@ -150,13 +178,15 @@
             word-break: keep-all;
             height: 25px;
         }
+        /* 정답이든 오답이든 이름은 보여줌 */
         .station-name.revealed { color: #333; font-weight: bold; }
+        .station-name.missed-name { color: #999; text-decoration: line-through; }
 
         .transfer-badges { display: flex; gap: 2px; justify-content: center; margin-top: 2px; visibility: hidden;}
         .revealed .transfer-badges { visibility: visible; }
         .line-badge { width: 6px; height: 6px; border-radius: 50%; display: inline-block; }
 
-        /* --- 5. 게임 영역 --- */
+        /* 게임 영역 */
         #game-area {
             background-color: white;
             border-radius: 20px;
@@ -208,7 +238,7 @@
             font-weight: bold;
         }
 
-        /* --- 6. 설명 카드 + 스피커 --- */
+        /* 설명 카드 */
         #info-card {
             background-color: #FFF;
             border-radius: 20px;
@@ -256,23 +286,30 @@
 </head>
 <body>
 
-    <div id="start-screen">
+    <div id="start-screen" class="screen">
         <h1 style="font-size: 40px; margin-bottom: 10px;">🔊 지하철 척척박사</h1>
         <p style="font-size: 18px; color:#666; margin-bottom: 30px;">오늘은 어떤 노선을 운전해볼까요?</p>
         
         <div class="menu-container">
-            <button class="menu-btn btn-line1" onclick="selectLine('1')">🟦 1호선<br><span style="font-size:16px">(서울역➡인천)</span></button>
-            <button class="menu-btn btn-line2" onclick="selectLine('2')">🟩 2호선<br><span style="font-size:16px">(빙글빙글 순환)</span></button>
-            <button class="menu-btn btn-line3" onclick="selectLine('3')">🟧 3호선<br><span style="font-size:16px">(오금➡대화)</span></button>
-            <button class="menu-btn btn-line4" onclick="selectLine('4')">🟦 4호선<br><span style="font-size:16px">(오이도➡진접)</span></button>
-            <button class="menu-btn btn-line5" onclick="selectLine('5')">🟪 5호선<br><span style="font-size:16px">(방화➡하남)</span></button>
-            <button class="menu-btn btn-line9" onclick="selectLine('9')">🟨 9호선<br><span style="font-size:16px">(보훈병원➡개화)</span></button>
+            <button class="menu-btn btn-line1" onclick="showDirection('1')">🟦 1호선<br><span style="font-size:16px">(서울역 ↔ 인천)</span></button>
+            <button class="menu-btn btn-line2" onclick="showDirection('2')">🟩 2호선<br><span style="font-size:16px">(순환선)</span></button>
+            <button class="menu-btn btn-line3" onclick="showDirection('3')">🟧 3호선<br><span style="font-size:16px">(오금 ↔ 대화)</span></button>
+            <button class="menu-btn btn-line4" onclick="showDirection('4')">🟦 4호선<br><span style="font-size:16px">(오이도 ↔ 진접)</span></button>
+            <button class="menu-btn btn-line5" onclick="showDirection('5')">🟪 5호선<br><span style="font-size:16px">(방화 ↔ 하남)</span></button>
+            <button class="menu-btn btn-line9" onclick="showDirection('9')">🟨 9호선<br><span style="font-size:16px">(보훈병원 ↔ 개화)</span></button>
         </div>
+    </div>
+
+    <div id="direction-screen" class="screen">
+        <h2 style="font-size: 30px; margin-bottom: 30px;">어느 방향으로 갈까요?</h2>
+        <button id="dir-btn-forward" class="direction-btn" onclick="startGameWithDirection(false)">➡ 정방향</button>
+        <button id="dir-btn-reverse" class="direction-btn" onclick="startGameWithDirection(true)">⬅ 역방향</button>
+        <button style="margin-top:20px; background:none; border:none; color:#999; text-decoration:underline; cursor:pointer;" onclick="location.reload()">뒤로 가기</button>
     </div>
 
     <header id="game-header">
         <h1 id="game-title">노선 이름</h1>
-        <div id="score-board">진행도: <span class="highlight-score">0</span> / 0</div>
+        <div id="score-board">맞춘 개수: <span class="highlight-score">0</span> / 0</div>
     </header>
 
     <div class="container" id="game-container">
@@ -291,8 +328,9 @@
 
                 <div id="success-screen">
                     <h2 style="font-size:35px;">🎉 종점 도착! 🎉</h2>
-                    <p id="success-msg" style="font-size:22px;">와! 끝까지 다 왔어요!</p>
-                    <button class="nav-btn" onclick="location.reload()">다른 노선도 해보기</button>
+                    <p id="success-msg" style="font-size:22px;">운전 종료!</p>
+                    <p id="final-score" style="font-size:20px; color:#FF8F00; font-weight:bold;"></p>
+                    <button class="nav-btn" onclick="location.reload()">처음으로</button>
                 </div>
             </div>
         </div>
@@ -312,7 +350,7 @@
     </div>
 
     <script>
-        // --- 1. 데이터 (전체 노선) ---
+        // --- 1. 데이터 ---
         const lineColors = {
             "1": "#0052A4", "2": "#009D3E", "3": "#EF7C1C", "4": "#00A0E9", 
             "5": "#996CAC", "6": "#CD7C2F", "7": "#747F00", "8": "#E6186C", "9": "#AA9872",
@@ -330,7 +368,7 @@
 
         const gameData = {
             "1": {
-                name: "1호선 (서울역 ➡ 인천)",
+                name: "1호선",
                 mainColor: "#0052A4",
                 stations: [
                     { name: "서울역", trans: ["4", "공항", "경의중앙"], desc: "우리나라에서 제일 큰 기차역! 케이티엑스가 칙칙폭폭!" },
@@ -365,7 +403,7 @@
                 ]
             },
             "2": {
-                name: "2호선 (초록색 순환선)",
+                name: "2호선",
                 mainColor: "#009D3E",
                 stations: [
                     { name: "시청", trans: ["1"], desc: "서울의 중심! 시청 앞 광장에서 뛰어놀자." },
@@ -415,7 +453,7 @@
                 ]
             },
             "3": {
-                name: "3호선 (오금 ➡ 대화)",
+                name: "3호선",
                 mainColor: "#EF7C1C",
                 stations: [
                     { name: "오금", trans: ["5"], desc: "3호선이 시작하는 곳이야." },
@@ -464,7 +502,7 @@
                 ]
             },
             "4": {
-                name: "4호선 (오이도 ➡ 진접)",
+                name: "4호선",
                 mainColor: "#00A0E9",
                 stations: [
                     { name: "오이도", trans: ["수인분당"], desc: "빨간 등대와 바다가 있어! 갈매기야 안녕? 🌊" },
@@ -520,7 +558,7 @@
                 ]
             },
             "5": {
-                name: "5호선 (방화 ➡ 하남검단산)",
+                name: "5호선",
                 mainColor: "#996CAC",
                 stations: [
                     { name: "방화", trans: [], desc: "5호선 기차들이 쉬는 곳이야. 꽃이 피는 동네래!" },
@@ -575,7 +613,7 @@
                 ]
             },
             "9": {
-                name: "9호선 (중앙보훈 ➡ 개화)",
+                name: "9호선",
                 mainColor: "#AA9872",
                 stations: [
                     { name: "중앙보훈병원", trans: [], desc: "나라를 지킨 영웅들을 위한 병원이야." },
@@ -623,12 +661,13 @@
         let currentLine = null;
         let stationList = [];
         let currentIndex = 0;
+        let score = 0;
         let currentDescText = ""; 
         let audioContext = null; 
         let isProcessing = false; 
+        let tempLineId = ''; // 방향 선택 전 임시 저장
 
         // --- 2. 오디오 기능 ---
-        
         function unlockAudio() {
             if (!audioContext) audioContext = new (window.AudioContext || window.webkitAudioContext)();
             if (audioContext.state === 'suspended') audioContext.resume();
@@ -639,32 +678,33 @@
             }
         }
 
-        function playChime() {
+        function playChime(type) {
             if (!audioContext) audioContext = new (window.AudioContext || window.webkitAudioContext)();
             const now = audioContext.currentTime;
-            
             const masterGain = audioContext.createGain();
             masterGain.gain.value = 0.3; 
             masterGain.connect(audioContext.destination);
 
-            const notes = [523.25, 659.25, 783.99, 1046.50]; 
-            const times = [0, 0.4, 0.8, 1.2]; 
+            let notes, times;
+            if(type === 'correct') { // 딩동댕
+                notes = [523.25, 659.25, 783.99, 1046.50]; 
+                times = [0, 0.2, 0.4, 0.6]; 
+            } else { // 땡 (낮은 도 두번)
+                notes = [261.63, 261.63];
+                times = [0, 0.3];
+            }
 
             notes.forEach((freq, i) => {
                 const osc = audioContext.createOscillator();
                 const gain = audioContext.createGain();
-                
-                osc.type = 'sine'; 
+                osc.type = type === 'correct' ? 'sine' : 'triangle'; 
                 osc.frequency.value = freq;
-                
                 gain.gain.setValueAtTime(0.5, now + times[i]);
-                gain.gain.exponentialRampToValueAtTime(0.001, now + times[i] + 0.6); 
-                
+                gain.gain.exponentialRampToValueAtTime(0.001, now + times[i] + 0.4); 
                 osc.connect(gain);
                 gain.connect(masterGain); 
-                
                 osc.start(now + times[i]);
-                osc.stop(now + times[i] + 0.6);
+                osc.stop(now + times[i] + 0.5);
             });
         }
 
@@ -685,21 +725,19 @@
                            || korVoices[0];
 
             if(bestVoice) utterance.voice = bestVoice;
-
             window.speechSynthesis.speak(utterance);
         }
 
-        if (window.speechSynthesis) {
-            window.speechSynthesis.onvoiceschanged = () => {};
-        }
+        if (window.speechSynthesis) { window.speechSynthesis.onvoiceschanged = () => {}; }
 
-        function speakWithChime() {
+        function speakWithChime(isCorrect) {
             if(!currentDescText) return;
-            playChime();
-            playSafeVoice(currentDescText);
+            playChime(isCorrect ? 'correct' : 'wrong');
+            // 틀렸을 땐 설명 없이 바로 넘어가거나 간단히 말하기 (여기선 설명 읽어줌)
+            setTimeout(() => { playSafeVoice(currentDescText); }, 800);
         }
 
-        // --- 3. 키보드 입력 기능 ---
+        // --- 3. 키보드 입력 ---
         document.addEventListener('keydown', (e) => {
             if (document.getElementById('play-screen').style.display !== 'block') return;
             if (isProcessing) return; 
@@ -723,13 +761,28 @@
         });
 
         // --- 4. 게임 로직 ---
-        function selectLine(lineId) {
-            unlockAudio(); 
+        function showDirection(lineId) {
+            unlockAudio();
+            tempLineId = lineId;
+            const lineData = gameData[lineId];
+            const first = lineData.stations[0].name;
+            const last = lineData.stations[lineData.stations.length-1].name;
 
-            currentLine = gameData[lineId];
-            stationList = currentLine.stations;
-            
+            // 방향 버튼 텍스트 업데이트
+            document.getElementById('dir-btn-forward').innerText = `➡ ${first} 출발 → ${last} 도착`;
+            document.getElementById('dir-btn-reverse').innerText = `⬅ ${last} 출발 → ${first} 도착`;
+
+            // 화면 전환
             document.getElementById('start-screen').style.display = 'none';
+            document.getElementById('direction-screen').style.display = 'flex';
+        }
+
+        function startGameWithDirection(isReverse) {
+            currentLine = gameData[tempLineId];
+            // 배열 복사 후 뒤집기 (원본 보존)
+            stationList = isReverse ? [...currentLine.stations].reverse() : [...currentLine.stations];
+
+            document.getElementById('direction-screen').style.display = 'none';
             document.getElementById('game-header').style.display = 'flex';
             document.getElementById('game-container').style.display = 'flex';
             
@@ -742,6 +795,7 @@
 
         function initGame() {
             currentIndex = 0;
+            score = 0;
             isProcessing = false; 
             updateScore();
             
@@ -755,13 +809,13 @@
             currentDescText = "안녕? 나는 지하철 요정이야. 정답을 맞추면 이야기를 읽어줄게!"; 
             
             drawMapInitial();
-            revealStation(0);
+            revealStation(0, true); // 출발역은 항상 정답 처리(활성화)
             loadQuestion();
         }
 
         function updateScore() {
             document.getElementById('score-board').innerHTML = 
-                `진행도: <span class="highlight-score">${currentIndex}</span> / ${stationList.length - 1}`;
+                `맞춘 개수: <span class="highlight-score">${score}</span> / ${stationList.length - 1}`;
         }
 
         function drawMapInitial() {
@@ -800,16 +854,23 @@
             });
         }
 
-        function revealStation(index) {
+        function revealStation(index, isSuccess) {
             const dot = document.getElementById(`dot-${index}`);
             const name = document.getElementById(`name-${index}`);
             
             if(dot) {
-                dot.classList.add('active');
-                dot.style.backgroundColor = currentLine.mainColor;
-                dot.style.borderColor = currentLine.mainColor;
+                if(isSuccess) {
+                    dot.classList.add('active');
+                    dot.style.backgroundColor = currentLine.mainColor;
+                    dot.style.borderColor = currentLine.mainColor;
+                } else {
+                    dot.classList.add('missed'); // 틀림 표시 (회색/X)
+                }
             }
-            if(name) name.classList.add('revealed');
+            if(name) {
+                name.classList.add('revealed');
+                if(!isSuccess) name.classList.add('missed-name');
+            }
         }
 
         function loadQuestion() {
@@ -858,76 +919,69 @@
 
         function checkAnswer(selectedName, nextData, btnElement) {
             if (isProcessing) return;
+            isProcessing = true; // 중복 클릭 방지
 
             const messageEl = document.getElementById('message');
+            const btns = document.querySelectorAll('.option-btn');
+            btns.forEach(b => b.disabled = true); // 버튼 잠금
+
+            // 공통: 다음 역 인덱스로 이동
+            currentIndex++;
+            
+            // 설명 텍스트 준비
+            document.getElementById('info-title').innerText = `${nextData.name}역 이야기 📖`;
+            document.getElementById('info-text').innerHTML = nextData.desc;
+            
+            // 안내방송 멘트 생성
+            const textToRead = `이번 역은 ${nextData.name}, ${nextData.name} 역입니다. ${nextData.desc}`;
+            currentDescText = textToRead;
 
             if (selectedName === nextData.name) {
                 // [정답]
-                isProcessing = true; 
+                score++;
                 messageEl.innerText = "딩동댕! 정답입니다! ⭕";
                 messageEl.className = "correct";
-                
-                currentIndex++;
                 updateScore();
-                revealStation(currentIndex); 
-
-                document.getElementById('info-title').innerText = `${nextData.name}역 이야기 📖`;
-                document.getElementById('info-text').innerHTML = nextData.desc;
-                
-                const textToRead = `이번 역은 ${nextData.name}, ${nextData.name} 역입니다. ${nextData.desc}`;
-                currentDescText = textToRead; 
+                revealStation(currentIndex, true); // 맵에 색칠
                 
                 unlockAudio(); 
-                speakWithChime(); 
-
-                const btns = document.querySelectorAll('.option-btn');
-                btns.forEach(b => b.disabled = true);
-
-                setTimeout(() => {
-                    messageEl.innerText = "";
-                    loadQuestion();
-                }, 1500);
+                speakWithChime(true); // 딩동댕 소리
 
             } else {
-                // [오답]
-                let feedbackText = "";
-                if (otherStationsDB[selectedName]) {
-                    feedbackText = `(땡! ${otherStationsDB[selectedName]}이에요)`;
-                } else {
-                    const foundInCurrent = stationList.find(s => s.name === selectedName);
-                    if (foundInCurrent) {
-                        feedbackText = `(같은 노선이지만 다음 역은 아니에요)`;
-                    } else {
-                        feedbackText = "(다른 호선 역이에요)";
-                    }
-                }
-
-                let feedbackSpan = btnElement.querySelector('.wrong-feedback');
-                if(!feedbackSpan) {
-                    feedbackSpan = document.createElement('span');
-                    feedbackSpan.className = 'wrong-feedback';
-                    btnElement.appendChild(feedbackSpan);
-                }
-                feedbackSpan.innerText = feedbackText;
-
-                messageEl.innerText = "틀렸어요. 다시 생각해볼까요? ❌";
+                // [오답] -> 패스 모드
+                messageEl.innerText = `땡! 정답은 ${nextData.name}역이었습니다! ❌`;
                 messageEl.className = "wrong";
                 btnElement.style.backgroundColor = "#fff5f5";
+                
+                revealStation(currentIndex, false); // 맵에 회색 표시
+
+                unlockAudio();
+                // 땡 소리만 내고 설명은 읽어줌 (교육적 목적)
+                speakWithChime(false); 
             }
+
+            // 1.5초 후 다음 문제
+            setTimeout(() => {
+                messageEl.innerText = "";
+                loadQuestion();
+            }, 1800);
         }
 
         function gameClear() {
             document.getElementById('play-screen').style.display = 'none';
             document.getElementById('success-screen').style.display = 'block';
-            document.getElementById('score-board').innerHTML = `완료! <span class="highlight-score">${stationList.length-1}</span> / ${stationList.length-1}`;
             
-            const clearText = `와! ${currentLine.name}을 전부 외웠구나! 정말 대단해! 척척박사님 최고!`;
-            document.getElementById('info-title').innerText = "축하해! 🎉";
+            document.getElementById('final-score').innerText = 
+                `총 ${stationList.length-1}개 중 ${score}개를 맞췄어요!`;
+            
+            const clearText = `와! ${currentLine.name} 운전을 마쳤어! 정말 수고했어!`;
+            document.getElementById('info-title').innerText = "운행 종료! 🎉";
             document.getElementById('info-text').innerHTML = clearText;
             
             currentDescText = clearText;
             unlockAudio();
-            speakWithChime();
+            playChime('correct');
+            setTimeout(() => playSafeVoice(clearText), 800);
         }
     </script>
 </body>
