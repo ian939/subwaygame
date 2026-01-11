@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>말하는 지하철 척척박사님 (방향선택 + 패스모드)</title>
+    <title>말하는 지하철 척척박사님 (최종 완성)</title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Jua&display=swap');
         
@@ -150,24 +150,24 @@
         .station-dot {
             width: 14px;
             height: 14px;
-            background-color: #eee; /* 기본 회색 */
+            background-color: #eee;
             border: 2px solid #ddd;
             border-radius: 50%;
             z-index: 1;
             transition: all 0.4s;
         }
         
-        /* 정답 맞췄을 때 (색칠됨) */
+        /* 정답 맞췄을 때 */
         .station-dot.active {
             transform: scale(1.3);
             border: 2px solid white;
             box-shadow: 0 0 5px rgba(0,0,0,0.3);
         }
         
-        /* 틀렸을 때 (회색 유지 + X 표시 느낌) */
+        /* 틀렸을 때 (회색 유지 + 테두리 진하게) */
         .station-dot.missed {
-            background-color: #999 !important;
-            border: 2px solid #555 !important;
+            background-color: #bbb !important;
+            border: 2px solid #666 !important;
         }
 
         .station-name {
@@ -178,9 +178,8 @@
             word-break: keep-all;
             height: 25px;
         }
-        /* 정답이든 오답이든 이름은 보여줌 */
         .station-name.revealed { color: #333; font-weight: bold; }
-        .station-name.missed-name { color: #999; text-decoration: line-through; }
+        .station-name.missed-name { color: #888; } /* 오답은 조금 흐리게 */
 
         .transfer-badges { display: flex; gap: 2px; justify-content: center; margin-top: 2px; visibility: hidden;}
         .revealed .transfer-badges { visibility: visible; }
@@ -339,7 +338,7 @@
             <div id="info-card">
                 <div id="info-header">
                     <h3 id="info-title">역 이야기 📖</h3>
-                    <button id="speak-btn" onclick="speakWithChime()" title="다시 듣기">🔊</button>
+                    <button id="speak-btn" onclick="speakCurrentText()" title="다시 듣기">🔊</button>
                 </div>
                 <div id="info-text">
                     안녕? 나는 지하철 요정이야.<br>
@@ -355,7 +354,7 @@
             "1": "#0052A4", "2": "#009D3E", "3": "#EF7C1C", "4": "#00A0E9", 
             "5": "#996CAC", "6": "#CD7C2F", "7": "#747F00", "8": "#E6186C", "9": "#AA9872",
             "분당": "#F5A200", "신분당": "#D4003B", "공항": "#0090D2", 
-            "신림": "#6789CA", "서해": "#81A914", "인천1": "#7CA8D5", "수인분당": "#F5A200", "경의중앙": "#77C4A3", "GTX": "#9A6292"
+            "신림": "#6789CA", "서해": "#81A914", "인천1": "#7CA8D5", "수인분당": "#F5A200", "경의중앙": "#77C4A3"
         };
 
         const otherStationsDB = {
@@ -665,79 +664,27 @@
         let currentDescText = ""; 
         let audioContext = null; 
         let isProcessing = false; 
-        let tempLineId = ''; // 방향 선택 전 임시 저장
+        let tempLineId = ''; 
 
-        // --- 2. 오디오 기능 ---
-        function unlockAudio() {
-            if (!audioContext) audioContext = new (window.AudioContext || window.webkitAudioContext)();
-            if (audioContext.state === 'suspended') audioContext.resume();
-            
-            if (window.speechSynthesis) {
-                const emptyUtterance = new SpeechSynthesisUtterance('');
-                window.speechSynthesis.speak(emptyUtterance);
-            }
-        }
-
-        function playChime(type) {
-            if (!audioContext) audioContext = new (window.AudioContext || window.webkitAudioContext)();
-            const now = audioContext.currentTime;
-            const masterGain = audioContext.createGain();
-            masterGain.gain.value = 0.3; 
-            masterGain.connect(audioContext.destination);
-
-            let notes, times;
-            if(type === 'correct') { // 딩동댕
-                notes = [523.25, 659.25, 783.99, 1046.50]; 
-                times = [0, 0.2, 0.4, 0.6]; 
-            } else { // 땡 (낮은 도 두번)
-                notes = [261.63, 261.63];
-                times = [0, 0.3];
-            }
-
-            notes.forEach((freq, i) => {
-                const osc = audioContext.createOscillator();
-                const gain = audioContext.createGain();
-                osc.type = type === 'correct' ? 'sine' : 'triangle'; 
-                osc.frequency.value = freq;
-                gain.gain.setValueAtTime(0.5, now + times[i]);
-                gain.gain.exponentialRampToValueAtTime(0.001, now + times[i] + 0.4); 
-                osc.connect(gain);
-                gain.connect(masterGain); 
-                osc.start(now + times[i]);
-                osc.stop(now + times[i] + 0.5);
-            });
-        }
-
-        function playSafeVoice(text) {
+        // --- 2. 오디오 기능 (원하시던 심플 버전 + 안내방송 멘트) ---
+        
+        function speakText(text) {
             if (!window.speechSynthesis) return;
             window.speechSynthesis.cancel(); 
 
             const utterance = new SpeechSynthesisUtterance(text);
             utterance.lang = 'ko-KR';
             utterance.rate = 1.0; 
-            utterance.pitch = 1.2; 
+            utterance.pitch = 1.1; // ★ 원하시던 목소리 톤
 
-            const voices = window.speechSynthesis.getVoices();
-            const korVoices = voices.filter(v => v.lang.includes('ko'));
-            const bestVoice = korVoices.find(v => v.name.includes('Google')) 
-                           || korVoices.find(v => v.name.includes('Siri'))
-                           || korVoices.find(v => v.name.includes('Premium'))
-                           || korVoices[0];
-
-            if(bestVoice) utterance.voice = bestVoice;
             window.speechSynthesis.speak(utterance);
         }
 
-        if (window.speechSynthesis) { window.speechSynthesis.onvoiceschanged = () => {}; }
-
-        function speakWithChime(isCorrect) {
-            if(!currentDescText) return;
-            playChime(isCorrect ? 'correct' : 'wrong');
-            // 틀렸을 땐 설명 없이 바로 넘어가거나 간단히 말하기 (여기선 설명 읽어줌)
-            setTimeout(() => { playSafeVoice(currentDescText); }, 800);
+        function speakCurrentText() {
+            speakText(currentDescText);
         }
 
-        // --- 3. 키보드 입력 ---
+        // --- 3. 키보드 입력 기능 ---
         document.addEventListener('keydown', (e) => {
             if (document.getElementById('play-screen').style.display !== 'block') return;
             if (isProcessing) return; 
@@ -762,24 +709,20 @@
 
         // --- 4. 게임 로직 ---
         function showDirection(lineId) {
-            unlockAudio();
             tempLineId = lineId;
             const lineData = gameData[lineId];
             const first = lineData.stations[0].name;
             const last = lineData.stations[lineData.stations.length-1].name;
 
-            // 방향 버튼 텍스트 업데이트
             document.getElementById('dir-btn-forward').innerText = `➡ ${first} 출발 → ${last} 도착`;
             document.getElementById('dir-btn-reverse').innerText = `⬅ ${last} 출발 → ${first} 도착`;
 
-            // 화면 전환
             document.getElementById('start-screen').style.display = 'none';
             document.getElementById('direction-screen').style.display = 'flex';
         }
 
         function startGameWithDirection(isReverse) {
             currentLine = gameData[tempLineId];
-            // 배열 복사 후 뒤집기 (원본 보존)
             stationList = isReverse ? [...currentLine.stations].reverse() : [...currentLine.stations];
 
             document.getElementById('direction-screen').style.display = 'none';
@@ -809,7 +752,7 @@
             currentDescText = "안녕? 나는 지하철 요정이야. 정답을 맞추면 이야기를 읽어줄게!"; 
             
             drawMapInitial();
-            revealStation(0, true); // 출발역은 항상 정답 처리(활성화)
+            revealStation(0, true); 
             loadQuestion();
         }
 
@@ -864,7 +807,7 @@
                     dot.style.backgroundColor = currentLine.mainColor;
                     dot.style.borderColor = currentLine.mainColor;
                 } else {
-                    dot.classList.add('missed'); // 틀림 표시 (회색/X)
+                    dot.classList.add('missed'); 
                 }
             }
             if(name) {
@@ -919,20 +862,18 @@
 
         function checkAnswer(selectedName, nextData, btnElement) {
             if (isProcessing) return;
-            isProcessing = true; // 중복 클릭 방지
+            isProcessing = true; 
 
             const messageEl = document.getElementById('message');
             const btns = document.querySelectorAll('.option-btn');
-            btns.forEach(b => b.disabled = true); // 버튼 잠금
+            btns.forEach(b => b.disabled = true); 
 
-            // 공통: 다음 역 인덱스로 이동
             currentIndex++;
             
-            // 설명 텍스트 준비
             document.getElementById('info-title').innerText = `${nextData.name}역 이야기 📖`;
             document.getElementById('info-text').innerHTML = nextData.desc;
             
-            // 안내방송 멘트 생성
+            // 안내방송 멘트 + 설명
             const textToRead = `이번 역은 ${nextData.name}, ${nextData.name} 역입니다. ${nextData.desc}`;
             currentDescText = textToRead;
 
@@ -942,10 +883,9 @@
                 messageEl.innerText = "딩동댕! 정답입니다! ⭕";
                 messageEl.className = "correct";
                 updateScore();
-                revealStation(currentIndex, true); // 맵에 색칠
+                revealStation(currentIndex, true); 
                 
-                unlockAudio(); 
-                speakWithChime(true); // 딩동댕 소리
+                speakText(textToRead); 
 
             } else {
                 // [오답] -> 패스 모드
@@ -953,18 +893,18 @@
                 messageEl.className = "wrong";
                 btnElement.style.backgroundColor = "#fff5f5";
                 
-                revealStation(currentIndex, false); // 맵에 회색 표시
+                revealStation(currentIndex, false); 
 
-                unlockAudio();
-                // 땡 소리만 내고 설명은 읽어줌 (교육적 목적)
-                speakWithChime(false); 
+                // 틀렸을 땐 정답만 알려주고 설명 읽어주기
+                const wrongText = `땡! 정답은 ${nextData.name} 역입니다. ${nextData.desc}`;
+                currentDescText = wrongText;
+                speakText(wrongText); 
             }
 
-            // 1.5초 후 다음 문제
             setTimeout(() => {
                 messageEl.innerText = "";
                 loadQuestion();
-            }, 1800);
+            }, 2500); // 읽는 시간 고려해서 조금 더 여유있게
         }
 
         function gameClear() {
@@ -979,9 +919,7 @@
             document.getElementById('info-text').innerHTML = clearText;
             
             currentDescText = clearText;
-            unlockAudio();
-            playChime('correct');
-            setTimeout(() => playSafeVoice(clearText), 800);
+            speakText(clearText);
         }
     </script>
 </body>
